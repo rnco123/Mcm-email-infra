@@ -30,7 +30,7 @@ import { AuditLog } from './common/entities/audit-log.entity';
         database: configService.get('DATABASE_NAME', 'email_infrastructure'),
         entities: [Tenant, Domain, EmailLog, Broadcast, BroadcastContact, AuditLog],
         synchronize: configService.get('NODE_ENV') === 'development',
-        logging: false, // Set to ['error', 'warn'] if you want to see errors only
+        logging: false, // Disabled to reduce console noise
         ssl: configService.get('DATABASE_SSL') === 'true' ? {
           rejectUnauthorized: false,
         } : false,
