@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BroadcastService } from './broadcast.service';
 import { BroadcastController } from './broadcast.controller';
@@ -11,7 +11,7 @@ import { SqsModule } from '../sqs/sqs.module';
   imports: [
     TypeOrmModule.forFeature([Broadcast, BroadcastContact]),
     TenantModule,
-    SqsModule,
+    forwardRef(() => SqsModule),
   ],
   controllers: [BroadcastController],
   providers: [BroadcastService],

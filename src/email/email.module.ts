@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailService } from './email.service';
 import { EmailController } from './email.controller';
@@ -10,7 +10,7 @@ import { SqsModule } from '../sqs/sqs.module';
   imports: [
     TypeOrmModule.forFeature([EmailLog]),
     TenantModule,
-    SqsModule,
+    forwardRef(() => SqsModule),
   ],
   controllers: [EmailController],
   providers: [EmailService],
