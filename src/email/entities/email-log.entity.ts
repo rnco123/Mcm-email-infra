@@ -49,7 +49,7 @@ export class EmailLog {
   @Column('text', { nullable: true })
   text: string;
 
-  @Column({ nullable: true })
+  @Column('varchar', { nullable: true })
   resendEmailId: string | null;
 
   @Column({

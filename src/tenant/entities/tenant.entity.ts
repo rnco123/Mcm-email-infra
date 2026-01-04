@@ -16,8 +16,8 @@ export class Tenant {
   @Column({ unique: true })
   name: string;
 
-  @Column({ unique: true })
-  apiKey: string;
+  @Column('varchar', { unique: true, nullable: true })
+  apiKey: string | null;
 
   @Column({ default: true })
   isActive: boolean;

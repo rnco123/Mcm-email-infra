@@ -17,8 +17,8 @@ export class Domain {
   @Column()
   domain: string;
 
-  @Column()
-  resendApiKey: string;
+  @Column('varchar', { nullable: true })
+  resendApiKey: string | null;
 
   @Column({ default: true })
   isActive: boolean;
