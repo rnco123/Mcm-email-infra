@@ -94,9 +94,9 @@ export class BroadcastService {
       return this.contactRepository.create({
         broadcastId: broadcast.id,
         email: encryptedEmail,
-        personalization: encryptedPersonalization ? { encrypted: encryptedPersonalization } : null,
+        personalization: encryptedPersonalization ? ({ encrypted: encryptedPersonalization } as Record<string, any>) : undefined,
         status: ContactStatus.PENDING,
-      });
+      }) as BroadcastContact;
     });
 
     await this.contactRepository.save(contacts);

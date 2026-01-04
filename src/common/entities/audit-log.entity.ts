@@ -70,7 +70,7 @@ export class AuditLog {
   success: boolean;
 
   @Column('text', { nullable: true })
-  errorMessage: string; // Sanitized, no PHI
+  errorMessage: string | null; // Sanitized, no PHI
 
   @CreateDateColumn()
   createdAt: Date;

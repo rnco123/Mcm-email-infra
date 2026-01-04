@@ -50,7 +50,7 @@ export class EmailLog {
   text: string;
 
   @Column({ nullable: true })
-  resendEmailId: string;
+  resendEmailId: string | null;
 
   @Column({
     type: 'enum',

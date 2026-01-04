@@ -51,7 +51,7 @@ export class PhiMaskingService {
     obj: T,
     phiFields: string[] = ['email', 'to', 'from', 'personalization'],
   ): T {
-    const masked = { ...obj };
+    const masked: any = { ...obj };
     
     for (const field of phiFields) {
       if (masked[field]) {
@@ -67,7 +67,7 @@ export class PhiMaskingService {
       }
     }
     
-    return masked;
+    return masked as T;
   }
 
   /**

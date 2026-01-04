@@ -118,7 +118,7 @@ export class EncryptionService {
     obj: T,
     sensitiveFields: string[],
   ): T {
-    const encrypted = { ...obj };
+    const encrypted: any = { ...obj };
     for (const field of sensitiveFields) {
       if (encrypted[field] && typeof encrypted[field] === 'string') {
         encrypted[field] = this.encrypt(encrypted[field]);
@@ -127,7 +127,7 @@ export class EncryptionService {
         encrypted[field] = this.encrypt(JSON.stringify(encrypted[field]));
       }
     }
-    return encrypted;
+    return encrypted as T;
   }
 
   /**
@@ -137,7 +137,7 @@ export class EncryptionService {
     obj: T,
     sensitiveFields: string[],
   ): T {
-    const decrypted = { ...obj };
+    const decrypted: any = { ...obj };
     for (const field of sensitiveFields) {
       if (decrypted[field] && typeof decrypted[field] === 'string') {
         try {
@@ -148,7 +148,7 @@ export class EncryptionService {
         }
       }
     }
-    return decrypted;
+    return decrypted as T;
   }
 }
 

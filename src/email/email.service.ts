@@ -89,13 +89,13 @@ export class EmailService {
       to: encryptedTo,
       from: encryptedFrom,
       subject: sendEmailDto.subject, // Subject may contain PHI, but often doesn't
-      html: encryptedHtml,
-      text: encryptedText,
+      html: encryptedHtml || undefined,
+      text: encryptedText || undefined,
       status: EmailStatus.PENDING,
       metadata: sendEmailDto.metadata,
     });
 
-    const savedLog = await this.emailLogRepository.save(emailLog);
+    const savedLog = await this.emailLogRepository.save(emailLog) as EmailLog;
 
     // Log PHI creation for HIPAA compliance
     await this.auditLogService.logPhiCreation(tenantId, AuditResource.EMAIL_LOG, savedLog.id, {
@@ -150,7 +150,7 @@ export class EmailService {
       }
 
       emailLog.status = EmailStatus.SENT;
-      emailLog.resendEmailId = result.data?.id;
+      emailLog.resendEmailId = result.data?.id || null;
       emailLog.retryCount = message.retryCount || 0;
       await this.emailLogRepository.save(emailLog);
 
@@ -200,7 +200,7 @@ export class EmailService {
     }
   }
 
-  async findOne(tenantId: string, id: string): Promise<EmailLog> {
+  async findOne(tenantId: string, id: string): Promise<EmailLog | null> {
     const emailLog = await this.emailLogRepository.findOne({
       where: { id, tenantId },
     });

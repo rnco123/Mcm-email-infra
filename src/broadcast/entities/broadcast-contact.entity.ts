@@ -28,7 +28,7 @@ export class BroadcastContact {
   email: string;
 
   @Column('jsonb', { nullable: true })
-  personalization: Record<string, any>;
+  personalization: Record<string, any> | null;
 
   @Column({
     type: 'enum',
