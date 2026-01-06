@@ -14,6 +14,10 @@ import { EmailLog } from './email/entities/email-log.entity';
 import { Broadcast } from './broadcast/entities/broadcast.entity';
 import { BroadcastContact } from './broadcast/entities/broadcast-contact.entity';
 import { AuditLog } from './common/entities/audit-log.entity';
+import * as dns from 'dns';
+import { promisify } from 'util';
+
+const lookup = promisify(dns.lookup);
 
 @Module({
   imports: [
@@ -22,10 +26,28 @@ import { AuditLog } from './common/entities/audit-log.entity';
       envFilePath: '.env',
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: (configService: ConfigService) => {
+      useFactory: async (configService: ConfigService) => {
+        const originalHost = configService.get('DATABASE_HOST', 'localhost');
+        
+        // Resolve hostname to IPv4 address to force IPv4 connection (fixes Railway IPv6 ENETUNREACH error)
+        let dbHost = originalHost;
+        try {
+          // Only resolve if it's not already an IP address
+          if (!/^\d+\.\d+\.\d+\.\d+$/.test(originalHost)) {
+            const result = await lookup(originalHost, { family: 4 });
+            dbHost = result.address;
+            console.log(`✅ Resolved ${originalHost} to IPv4: ${dbHost}`);
+          } else {
+            console.log(`ℹ️  Using IP address directly: ${dbHost}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to resolve ${originalHost} to IPv4, using original hostname:`, error.message);
+          // Fallback to original hostname
+        }
+
         const dbConfig = {
           type: 'postgres' as const,
-          host: configService.get('DATABASE_HOST', 'localhost'),
+          host: dbHost,
           port: parseInt(configService.get('DATABASE_PORT', '5432'), 10),
           username: configService.get('DATABASE_USER', 'postgres'),
           password: configService.get('DATABASE_PASSWORD', 'postgres'),
@@ -43,8 +65,6 @@ import { AuditLog } from './common/entities/audit-log.entity';
             idleTimeoutMillis: 30000,
             keepAlive: true,
             keepAliveInitialDelayMillis: 0,
-            // Force IPv4 connection (fixes Railway IPv6 ENETUNREACH error)
-            family: 4,
           },
           // Remove retry attempts to fail faster and see errors immediately
           retryAttempts: 0,
@@ -53,6 +73,7 @@ import { AuditLog } from './common/entities/audit-log.entity';
         const isSupabasePooler = dbConfig.port === 6543;
         console.log('Attempting to connect to database:', {
           host: dbConfig.host,
+          originalHost: originalHost !== dbHost ? originalHost : undefined,
           port: dbConfig.port,
           database: dbConfig.database,
           username: dbConfig.username,
