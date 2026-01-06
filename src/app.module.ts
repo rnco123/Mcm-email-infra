@@ -18,6 +18,7 @@ import * as dns from 'dns';
 import { promisify } from 'util';
 
 const resolve4 = promisify(dns.resolve4);
+const lookup = promisify(dns.lookup);
 
 @Module({
   imports: [
@@ -31,10 +32,12 @@ const resolve4 = promisify(dns.resolve4);
         
         // Resolve hostname to IPv4 address to force IPv4 connection (fixes Railway IPv6 ENETUNREACH error)
         let dbHost = originalHost;
-        try {
-          // Only resolve if it's not already an IP address
-          if (!/^\d+\.\d+\.\d+\.\d+$/.test(originalHost)) {
-            // Use resolve4 to explicitly get only IPv4 addresses
+        let useHostname = false;
+        
+        // Only resolve if it's not already an IP address
+        if (!/^\d+\.\d+\.\d+\.\d+$/.test(originalHost)) {
+          try {
+            // Try resolve4 first (explicitly gets only IPv4)
             const addresses = await resolve4(originalHost);
             if (addresses && addresses.length > 0) {
               dbHost = addresses[0]; // Use first IPv4 address
@@ -42,14 +45,23 @@ const resolve4 = promisify(dns.resolve4);
             } else {
               throw new Error('No IPv4 addresses found');
             }
-          } else {
-            console.log(`ℹ️  Using IP address directly: ${dbHost}`);
+          } catch (resolveError) {
+            // If resolve4 fails, try lookup with family 4
+            try {
+              const result = await lookup(originalHost, { family: 4 });
+              dbHost = result.address;
+              console.log(`✅ Resolved ${originalHost} to IPv4 via lookup: ${dbHost}`);
+            } catch (lookupError) {
+              // DNS resolution failed - use hostname but force IPv4 in connection
+              console.warn(`⚠️  DNS resolution failed for ${originalHost}`);
+              console.warn(`   Error: ${resolveError.message}`);
+              console.warn(`   Using hostname directly with IPv4 forced in connection`);
+              dbHost = originalHost;
+              useHostname = true;
+            }
           }
-        } catch (error) {
-          console.error(`❌ Failed to resolve ${originalHost} to IPv4:`, error.message);
-          console.error(`   This will cause connection to fail. Check DNS configuration.`);
-          // Don't fallback - fail explicitly so we know the issue
-          throw new Error(`Cannot resolve database hostname ${originalHost} to IPv4. DNS error: ${error.message}`);
+        } else {
+          console.log(`ℹ️  Using IP address directly: ${dbHost}`);
         }
 
         const dbConfig = {
@@ -83,12 +95,17 @@ const resolve4 = promisify(dns.resolve4);
         console.log('Attempting to connect to database:', {
           host: dbConfig.host,
           originalHost: originalHost !== dbHost ? originalHost : undefined,
+          usingHostname: useHostname,
           port: dbConfig.port,
           database: dbConfig.database,
           username: dbConfig.username,
           ssl: dbConfig.ssl ? 'enabled' : 'disabled',
           pooler: isSupabasePooler ? 'Supabase Connection Pooler' : 'Direct Connection',
         });
+        
+        if (useHostname) {
+          console.warn('⚠️  Using hostname with IPv4 forced - ensure Railway DNS can resolve this hostname');
+        }
         
         if (isSupabasePooler) {
           console.log('ℹ️  Using Supabase Connection Pooler (port 6543)');
