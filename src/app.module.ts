@@ -14,20 +14,6 @@ import { EmailLog } from './email/entities/email-log.entity';
 import { Broadcast } from './broadcast/entities/broadcast.entity';
 import { BroadcastContact } from './broadcast/entities/broadcast-contact.entity';
 import { AuditLog } from './common/entities/audit-log.entity';
-import * as dns from 'dns';
-import { promisify } from 'util';
-
-// Force Node.js DNS to prefer IPv4 (fixes Railway IPv6 connection issues)
-// This must be set before any network connections are made
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first');
-  console.log('✅ DNS configured to prefer IPv4');
-} else {
-  console.warn('⚠️  dns.setDefaultResultOrder not available (Node.js < 17), IPv4 preference may not work');
-}
-
-const resolve4 = promisify(dns.resolve4);
-const lookup = promisify(dns.lookup);
 
 @Module({
   imports: [
@@ -36,96 +22,30 @@ const lookup = promisify(dns.lookup);
       envFilePath: '.env',
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: async (configService: ConfigService) => {
-        const originalHost = configService.get('DATABASE_HOST', 'localhost');
-        
-        // Resolve hostname to IPv4 address to force IPv4 connection (fixes Railway IPv6 ENETUNREACH error)
-        let dbHost = originalHost;
-        let useHostname = false;
-        
-        // Only resolve if it's not already an IP address
-        if (!/^\d+\.\d+\.\d+\.\d+$/.test(originalHost)) {
-          try {
-            // Try resolve4 first (explicitly gets only IPv4)
-            const addresses = await resolve4(originalHost);
-            if (addresses && addresses.length > 0) {
-              dbHost = addresses[0]; // Use first IPv4 address
-              console.log(`✅ Resolved ${originalHost} to IPv4: ${dbHost}`);
-            } else {
-              throw new Error('No IPv4 addresses found');
-            }
-          } catch (resolveError) {
-            // If resolve4 fails, try lookup with family 4
-            try {
-              const result = await lookup(originalHost, { family: 4 });
-              dbHost = result.address;
-              console.log(`✅ Resolved ${originalHost} to IPv4 via lookup: ${dbHost}`);
-            } catch (lookupError) {
-              // DNS resolution failed - use hostname but force IPv4 in connection
-              console.warn(`⚠️  DNS resolution failed for ${originalHost}`);
-              console.warn(`   Error: ${resolveError.message}`);
-              console.warn(`   Using hostname directly with IPv4 forced in connection`);
-              dbHost = originalHost;
-              useHostname = true;
-            }
-          }
-        } else {
-          console.log(`ℹ️  Using IP address directly: ${dbHost}`);
-        }
-
+      useFactory: (configService: ConfigService) => {
         const dbConfig = {
           type: 'postgres' as const,
-          host: dbHost,
+          host: configService.get('DATABASE_HOST', 'localhost'),
           port: parseInt(configService.get('DATABASE_PORT', '5432'), 10),
           username: configService.get('DATABASE_USER', 'postgres'),
           password: configService.get('DATABASE_PASSWORD', 'postgres'),
           database: configService.get('DATABASE_NAME', 'email_infrastructure'),
           entities: [Tenant, Domain, EmailLog, Broadcast, BroadcastContact, AuditLog],
           synchronize: configService.get('NODE_ENV') === 'development',
-          logging: false, // Disable verbose query logging
+          logging: false,
           ssl: configService.get('DATABASE_SSL') === 'true' ? {
             rejectUnauthorized: false,
             require: true,
           } : false,
           extra: {
             max: 10,
-            connectionTimeoutMillis: 10000, // 10 second timeout (matches working test)
+            connectionTimeoutMillis: 10000,
             idleTimeoutMillis: 30000,
             keepAlive: true,
             keepAliveInitialDelayMillis: 0,
-            // Force IPv4 for pg connection
-            family: 4,
           },
-          // Remove retry attempts to fail faster and see errors immediately
           retryAttempts: 0,
         };
-
-        const isSupabasePooler = dbConfig.port === 6543;
-        console.log('Attempting to connect to database:', {
-          host: dbConfig.host,
-          originalHost: originalHost !== dbHost ? originalHost : undefined,
-          usingHostname: useHostname,
-          port: dbConfig.port,
-          database: dbConfig.database,
-          username: dbConfig.username,
-          ssl: dbConfig.ssl ? 'enabled' : 'disabled',
-          pooler: isSupabasePooler ? 'Supabase Connection Pooler' : 'Direct Connection',
-        });
-        
-        if (useHostname) {
-          console.warn('⚠️  Using hostname with IPv4 forced - ensure Railway DNS can resolve this hostname');
-        }
-        
-        if (isSupabasePooler) {
-          console.log('ℹ️  Using Supabase Connection Pooler (port 6543)');
-          console.log('   If connection fails, try direct connection (port 5432)');
-        }
-        
-        console.log('⚠️  If this hangs, check:');
-        console.log('   1. Network connectivity to ' + dbConfig.host);
-        console.log('   2. Firewall allows connection on port ' + dbConfig.port);
-        console.log('   3. Database credentials are correct');
-        console.log('   4. For Supabase: Try port 5432 (direct) instead of 6543 (pooler)');
 
         return dbConfig;
       },
