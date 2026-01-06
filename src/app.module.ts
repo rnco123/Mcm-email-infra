@@ -7,6 +7,7 @@ import { BroadcastModule } from './broadcast/broadcast.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { SqsModule } from './sqs/sqs.module';
 import { CommonModule } from './common/common.module';
+import { HealthModule } from './health/health.module';
 import { Tenant } from './tenant/entities/tenant.entity';
 import { Domain } from './tenant/entities/domain.entity';
 import { EmailLog } from './email/entities/email-log.entity';
@@ -21,20 +22,55 @@ import { AuditLog } from './common/entities/audit-log.entity';
       envFilePath: '.env',
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DATABASE_HOST', 'localhost'),
-        port: configService.get('DATABASE_PORT', 5432),
-        username: configService.get('DATABASE_USER', 'postgres'),
-        password: configService.get('DATABASE_PASSWORD', 'postgres'),
-        database: configService.get('DATABASE_NAME', 'email_infrastructure'),
-        entities: [Tenant, Domain, EmailLog, Broadcast, BroadcastContact, AuditLog],
-        synchronize: configService.get('NODE_ENV') === 'development',
-        logging: false, // Disabled to reduce console noise
-        ssl: configService.get('DATABASE_SSL') === 'true' ? {
-          rejectUnauthorized: false,
-        } : false,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const dbConfig = {
+          type: 'postgres' as const,
+          host: configService.get('DATABASE_HOST', 'localhost'),
+          port: parseInt(configService.get('DATABASE_PORT', '5432'), 10),
+          username: configService.get('DATABASE_USER', 'postgres'),
+          password: configService.get('DATABASE_PASSWORD', 'postgres'),
+          database: configService.get('DATABASE_NAME', 'email_infrastructure'),
+          entities: [Tenant, Domain, EmailLog, Broadcast, BroadcastContact, AuditLog],
+          synchronize: configService.get('NODE_ENV') === 'development',
+          logging: false, // Disable verbose query logging
+          ssl: configService.get('DATABASE_SSL') === 'true' ? {
+            rejectUnauthorized: false,
+            require: true,
+          } : false,
+          extra: {
+            max: 10,
+            connectionTimeoutMillis: 10000, // 10 second timeout (matches working test)
+            idleTimeoutMillis: 30000,
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 0,
+          },
+          // Remove retry attempts to fail faster and see errors immediately
+          retryAttempts: 0,
+        };
+
+        const isSupabasePooler = dbConfig.port === 6543;
+        console.log('Attempting to connect to database:', {
+          host: dbConfig.host,
+          port: dbConfig.port,
+          database: dbConfig.database,
+          username: dbConfig.username,
+          ssl: dbConfig.ssl ? 'enabled' : 'disabled',
+          pooler: isSupabasePooler ? 'Supabase Connection Pooler' : 'Direct Connection',
+        });
+        
+        if (isSupabasePooler) {
+          console.log('ℹ️  Using Supabase Connection Pooler (port 6543)');
+          console.log('   If connection fails, try direct connection (port 5432)');
+        }
+        
+        console.log('⚠️  If this hangs, check:');
+        console.log('   1. Network connectivity to ' + dbConfig.host);
+        console.log('   2. Firewall allows connection on port ' + dbConfig.port);
+        console.log('   3. Database credentials are correct');
+        console.log('   4. For Supabase: Try port 5432 (direct) instead of 6543 (pooler)');
+
+        return dbConfig;
+      },
       inject: [ConfigService],
     }),
     CommonModule,
@@ -43,6 +79,7 @@ import { AuditLog } from './common/entities/audit-log.entity';
     BroadcastModule,
     WebhookModule,
     SqsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

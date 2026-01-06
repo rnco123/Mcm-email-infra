@@ -6,12 +6,15 @@ import {
   Param,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags, ApiSecurity } from '@nestjs/swagger';
 import { BroadcastService } from './broadcast.service';
 import { CreateBroadcastDto } from './dto/create-broadcast.dto';
 import { AddContactsDto } from './dto/add-contacts.dto';
 import { TenantInterceptor } from '../common/interceptors/tenant.interceptor';
 import { TenantId } from '../common/decorators/tenant.decorator';
 
+@ApiTags('broadcast')
+@ApiSecurity('api-key')
 @Controller('broadcast')
 @UseInterceptors(TenantInterceptor)
 export class BroadcastController {

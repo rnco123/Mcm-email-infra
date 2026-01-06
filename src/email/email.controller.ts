@@ -6,11 +6,14 @@ import {
   Param,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags, ApiSecurity, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EmailService } from './email.service';
 import { SendEmailDto } from './dto/send-email.dto';
 import { TenantInterceptor } from '../common/interceptors/tenant.interceptor';
 import { TenantId } from '../common/decorators/tenant.decorator';
 
+@ApiTags('email')
+@ApiSecurity('api-key')
 @Controller('email')
 @UseInterceptors(TenantInterceptor)
 export class EmailController {

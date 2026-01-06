@@ -17,10 +17,16 @@ export class TenantInterceptor implements NestInterceptor {
     next: CallHandler,
   ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
-    const apiKey = request.headers['x-api-key'] || request.headers['authorization']?.replace('Bearer ', '');
+    // Fastify normalizes headers to lowercase, but check multiple variations
+    const apiKey = 
+      request.headers['x-api-key'] || 
+      request.headers['x-apikey'] ||
+      request.headers['api-key'] ||
+      request.headers['authorization']?.replace('Bearer ', '') ||
+      request.headers['authorization']?.replace('ApiKey ', '');
 
     if (!apiKey) {
-      throw new UnauthorizedException('API key is required');
+      throw new UnauthorizedException('API key is required. Please provide X-API-Key header.');
     }
 
     const tenant = await this.tenantService.findByApiKey(apiKey);
