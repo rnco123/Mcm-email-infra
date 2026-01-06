@@ -43,6 +43,8 @@ import { AuditLog } from './common/entities/audit-log.entity';
             idleTimeoutMillis: 30000,
             keepAlive: true,
             keepAliveInitialDelayMillis: 0,
+            // Force IPv4 connection (fixes Railway IPv6 ENETUNREACH error)
+            family: 4,
           },
           // Remove retry attempts to fail faster and see errors immediately
           retryAttempts: 0,
