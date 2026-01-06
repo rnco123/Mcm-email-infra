@@ -17,6 +17,15 @@ import { AuditLog } from './common/entities/audit-log.entity';
 import * as dns from 'dns';
 import { promisify } from 'util';
 
+// Force Node.js DNS to prefer IPv4 (fixes Railway IPv6 connection issues)
+// This must be set before any network connections are made
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+  console.log('✅ DNS configured to prefer IPv4');
+} else {
+  console.warn('⚠️  dns.setDefaultResultOrder not available (Node.js < 17), IPv4 preference may not work');
+}
+
 const resolve4 = promisify(dns.resolve4);
 const lookup = promisify(dns.lookup);
 
