@@ -17,7 +17,7 @@ import { AuditLog } from './common/entities/audit-log.entity';
 import * as dns from 'dns';
 import { promisify } from 'util';
 
-const lookup = promisify(dns.lookup);
+const resolve4 = promisify(dns.resolve4);
 
 @Module({
   imports: [
@@ -34,15 +34,22 @@ const lookup = promisify(dns.lookup);
         try {
           // Only resolve if it's not already an IP address
           if (!/^\d+\.\d+\.\d+\.\d+$/.test(originalHost)) {
-            const result = await lookup(originalHost, { family: 4 });
-            dbHost = result.address;
-            console.log(`✅ Resolved ${originalHost} to IPv4: ${dbHost}`);
+            // Use resolve4 to explicitly get only IPv4 addresses
+            const addresses = await resolve4(originalHost);
+            if (addresses && addresses.length > 0) {
+              dbHost = addresses[0]; // Use first IPv4 address
+              console.log(`✅ Resolved ${originalHost} to IPv4: ${dbHost}`);
+            } else {
+              throw new Error('No IPv4 addresses found');
+            }
           } else {
             console.log(`ℹ️  Using IP address directly: ${dbHost}`);
           }
         } catch (error) {
-          console.warn(`⚠️  Failed to resolve ${originalHost} to IPv4, using original hostname:`, error.message);
-          // Fallback to original hostname
+          console.error(`❌ Failed to resolve ${originalHost} to IPv4:`, error.message);
+          console.error(`   This will cause connection to fail. Check DNS configuration.`);
+          // Don't fallback - fail explicitly so we know the issue
+          throw new Error(`Cannot resolve database hostname ${originalHost} to IPv4. DNS error: ${error.message}`);
         }
 
         const dbConfig = {
@@ -65,6 +72,8 @@ const lookup = promisify(dns.lookup);
             idleTimeoutMillis: 30000,
             keepAlive: true,
             keepAliveInitialDelayMillis: 0,
+            // Force IPv4 for pg connection
+            family: 4,
           },
           // Remove retry attempts to fail faster and see errors immediately
           retryAttempts: 0,
